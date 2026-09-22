@@ -1,0 +1,39 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - git
+write_files:
+  - path: /usr/local/bin/bootstrap-stack.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      REPO="${repo_url}"
+      USER_NAME="${admin_username}"
+      HOME_DIR="/home/$USER_NAME"
+      if [ -z "$REPO" ]; then
+        echo "no repo_url set, skipping auto deploy"
+        exit 0
+      fi
+      if [ ! -d "$HOME_DIR/project13" ]; then
+        sudo -u "$USER_NAME" git clone "$REPO" "$HOME_DIR/project13"
+      fi
+      cat > "$HOME_DIR/project13/stack/.env" <<ENVEOF
+      GF_ADMIN_USER=${grafana_admin_user}
+      GF_ADMIN_PASSWORD=${grafana_admin_password}
+      ENVEOF
+      chown "$USER_NAME:$USER_NAME" "$HOME_DIR/project13/stack/.env"
+      chmod 600 "$HOME_DIR/project13/stack/.env"
+      cd "$HOME_DIR/project13/stack"
+      docker compose up -d
+runcmd:
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - usermod -aG docker ${admin_username}
+  - /usr/local/bin/bootstrap-stack.sh

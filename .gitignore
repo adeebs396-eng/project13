@@ -1,0 +1,12 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+tfplan
+plan.txt
+
+# Secrets
+.env
+*.pem
+id_rsa*

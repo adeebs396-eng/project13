@@ -1,0 +1,7 @@
+subscription_id        = "REPLACE_ME"
+allowed_source_ips     = ["REPLACE_ME"]
+prefix                 = "REPLACE_ME"
+location               = "REPLACE_ME"
+vm_size                = "REPLACE_ME"
+repo_url               = "REPLACE_ME"
+grafana_admin_password = "REPLACE_ME"
