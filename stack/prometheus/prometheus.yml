@@ -1,6 +1,4 @@
-# STUB. Owned by Jana from here on.
-# Adeeb's only requirement is that this file exists and is valid,
-# so the container starts. Jana replaces the scrape_configs.
+# Owned by Jana. Adeeb only guarantees the file exists and the paths are right.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -13,6 +11,15 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  - job_name: node
+  - job_name: node-exporter
     static_configs:
       - targets: ["node-exporter:9100"]
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # Enabled only with: docker compose --profile database up -d
+  - job_name: postgres_exporter
+    static_configs:
+      - targets: ["postgres_exporter:9187"]
