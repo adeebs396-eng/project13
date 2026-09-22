@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+cd "$(dirname "$0")/../stack"
 
 LOG_FILE="/var/log/deployment/setup-env.log"
 mkdir -p "$(dirname "$LOG_FILE")"
