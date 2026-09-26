@@ -19,7 +19,8 @@ scrape_configs:
     static_configs:
       - targets: ["cadvisor:8080"]
 
-  # Enabled only with: docker compose --profile database up -d
-  - job_name: postgres_exporter
-    static_configs:
-      - targets: ["postgres_exporter:9187"]
+  # Uncomment together with: COMPOSE_PROFILES=database docker compose up -d
+  # Leaving this on while the profile is off makes InstanceDown fire forever.
+  # - job_name: postgres_exporter
+  #   static_configs:
+  #     - targets: ["postgres_exporter:9187"]

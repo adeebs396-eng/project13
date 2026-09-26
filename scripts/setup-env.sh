@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../stack"
 
-LOG_FILE="/var/log/deployment/setup-env.log"
+LOG_FILE="$HOME/project13-logs/setup-env.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"; }

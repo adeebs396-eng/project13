@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_DIR="/var/log/deployment"
+LOG_DIR="$HOME/project13-logs"
 LOG_FILE="${LOG_DIR}/install-docker.log"
 
 log() {
