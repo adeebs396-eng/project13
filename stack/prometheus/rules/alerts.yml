@@ -1,11 +1,105 @@
+# Alert rules for Project 13. Owned by Jana.
+#
+# Every expression here uses a metric this stack actually collects:
+#   up                  Prometheus itself, for every scrape target
+#   node_*              node-exporter, the VM
+#   container_*         cadvisor, the containers
+#   prometheus_*        Prometheus internals
+#
+# Check before committing:
+#   docker exec prometheus promtool check rules /etc/prometheus/rules/alerts.yml
+#   docker exec prometheus kill -HUP 1      (or curl -X POST localhost:9090/-/reload)
+
 groups:
-  - name: instance_down_alerts
+  - name: availability
     rules:
       - alert: InstanceDown
         expr: up == 0
-        for: 1m
+        for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "Instance {{ $labels.instance }} down"
-          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+          summary: "{{ $labels.job }} is down"
+          description: "Prometheus has failed to scrape {{ $labels.instance }} (job {{ $labels.job }}) for 2 minutes."
+
+      - alert: ContainerDisappeared
+        expr: time() - container_last_seen{name!=""} > 120
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} has stopped"
+          description: "cadvisor has not seen container {{ $labels.name }} for over 2 minutes. It crashed, was killed, or was removed."
+
+      # ContainerDisappeared depends on cadvisor being able to read container
+      # names from the Docker API. If it cannot, that alert silently never
+      # fires, which is worse than not having it. This catches that.
+      - alert: CadvisorNotReportingContainerNames
+        expr: absent(container_last_seen{name!=""})
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cadvisor is not reporting any named containers"
+          description: "ContainerDisappeared cannot fire while this is true. cadvisor is not reaching the Docker API. Check the /var/run mount for cadvisor in docker-compose.yml."
+
+  - name: host
+    rules:
+      - alert: HostHighCpu
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU above 85% on {{ $labels.instance }}"
+          description: "CPU has averaged {{ printf \"%.0f\" $value }}% for 10 minutes. The VM is a 2 vCPU D2s_v7, so this is close to saturated."
+
+      - alert: HostHighMemory
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory above 85% on {{ $labels.instance }}"
+          description: "{{ printf \"%.0f\" $value }}% of memory is in use. Prometheus retention is the usual cause."
+
+      - alert: HostLowDisk
+        expr: >-
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}
+           / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}) * 100 < 15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 15% disk free on {{ $labels.mountpoint }}"
+          description: "{{ printf \"%.0f\" $value }}% free on {{ $labels.mountpoint }} at {{ $labels.instance }}."
+
+      - alert: HostDiskWillFillIn24h
+        expr: >-
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}[6h], 24 * 3600) < 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.mountpoint }} will be full within 24 hours"
+          description: "Based on the last 6 hours, {{ $labels.mountpoint }} on {{ $labels.instance }} runs out of space inside a day. Lower PROMETHEUS_RETENTION_TIME or grow the disk."
+
+  - name: monitoring_itself
+    rules:
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus rejected its own config"
+          description: "The last config reload on {{ $labels.instance }} failed. Prometheus is still running on the previous config, so a change you pushed is not live."
+
+      - alert: PrometheusRuleEvaluationFailing
+        expr: increase(prometheus_rule_evaluation_failures_total[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An alert rule is failing to evaluate"
+          description: "Rule group {{ $labels.rule_group }} on {{ $labels.instance }} threw errors in the last 10 minutes. A rule in alerts.yml is broken, so it is not protecting anything."
